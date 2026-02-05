@@ -4,24 +4,31 @@ import time
 import random
 import string
 
-# إعدادات الصفحة
-st.set_page_config(page_title="Rec Room Hunter", page_icon="🎯")
+# Page Configuration
+st.set_page_config(page_title="RR Username Hunter", page_icon="⚡")
 
-st.title("🎯 صائد يوزرات ريك روم")
+st.title("⚡ Rec Room Username Hunter")
 
-# القائمة الجانبية
-st.sidebar.header("الاعدادات")
-mode = st.sidebar.selectbox("اختر نمط الفحص:", ["تخمين ثلاثي (3)", "تخمين رباعي (4)", "فحص قائمة مخصصة"])
-num_to_check = st.sidebar.slider("عدد اليوزرات للفحص:", 5, 100, 20)
+# Sidebar Settings
+st.sidebar.header("Settings")
+mode = st.sidebar.selectbox("Select Mode:", ["3-Char (Random)", "4-Char (Random)", "Custom List"])
+num_to_check = st.sidebar.slider("Number of users to check:", 10, 1000, 100)
+delay = st.sidebar.slider("Delay between checks (seconds):", 0.1, 1.0, 0.3)
 
 def check_user(user):
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    # Added rotating user agents to look more like a browser
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     url = f"https://rec.net/user/{user}"
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3)
         if response.status_code == 404:
             return "available"
-        return "taken"
+        elif response.status_code == 200:
+            return "taken"
+        else:
+            return "rate_limit"
     except:
         return "error"
 
@@ -29,44 +36,49 @@ def generate_user(length):
     chars = string.ascii_lowercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
 
-# واجهة المستخدم الرئيسية
-if "custom" in mode.lower() or "قائمة" in mode:
-    user_list = st.text_area("ادخل اليوزرات (كل يوزر في سطر):")
-    action_btn = st.button("بدء فحص القائمة")
-    to_check = user_list.split('\n') if user_list else []
+# Main Logic
+if "Custom" in mode:
+    user_input = st.text_area("Enter usernames (one per line):")
+    to_check = user_input.split('\n') if user_input else []
+    start_btn = st.button("Start Checking List")
 else:
-    length = 3 if "3" in mode or "ثلاثي" in mode else 4
-    action_btn = st.button(f"بدء تخمين {num_to_check} يوزر")
+    length = 3 if "3" in mode else 4
     to_check = [generate_user(length) for _ in range(num_to_check)]
+    start_btn = st.button(f"Generate & Check {num_to_check} Users")
 
-if action_btn and to_check:
-    st.write("---")
-    found = []
-    progress = st.progress(0)
+if start_btn and to_check:
+    st.divider()
+    found_list = []
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # Create columns for real-time results
+    col1, col2 = st.columns(2)
     
     for idx, user in enumerate(to_check):
         user = user.strip()
         if not user: continue
         
+        status_text.text(f"Checking: {user} ({idx+1}/{len(to_check)})")
         result = check_user(user)
         
         if result == "available":
-            st.success(f"✅ متاح: {user}")
-            found.append(user)
-        elif result == "taken":
-            st.text(f"❌ مأخوذ: {user}")
-        else:
-            st.warning(f"⚠️ خطأ في الاتصال: {user}")
-            
-        time.sleep(0.7) # حماية من الحظر
-        progress.progress((idx + 1) / len(to_check))
-    
-    st.divider()
-    if found:
-        st.balloons()
-        st.write("### اليوزرات المتاحة اللي لقيناها:")
-        st.code("\n".join(found))
-    else:
-        st.error("للأسف ما لقينا شي متاح في هذي الجولة. جرب مرة ثانية!")
+            col1.success(f"Available: {user}")
+            found_list.append(user)
+        elif result == "rate_limit":
+            st.error("Rate limit detected! Slow down the delay in settings.")
+            break
+        
+        # Update progress
+        progress_bar.progress((idx + 1) / len(to_check))
+        time.sleep(delay)
 
-st.caption("Rec Room Checker v2.0 - Fixed Syntax")
+    st.divider()
+    if found_list:
+        st.balloons()
+        st.write(f"### Found {len(found_list)} Available Usernames:")
+        st.code("\n".join(found_list))
+    else:
+        st.info("No available usernames found in this batch. Try again!")
+
+st.caption("Performance Mode Active | Max 1000 Users")
