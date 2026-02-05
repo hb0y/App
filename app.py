@@ -4,81 +4,79 @@ import time
 import random
 import string
 
-# Page Configuration
-st.set_page_config(page_title="RR Username Hunter", page_icon="⚡")
+# Optimization for Speed
+st.set_page_config(page_title="RR Hunter Pro", page_icon="🚀")
 
-st.title("⚡ Rec Room Username Hunter")
+st.title("🚀 Rec Room Fast Hunter")
+st.markdown("---")
 
-# Sidebar Settings
-st.sidebar.header("Settings")
-mode = st.sidebar.selectbox("Select Mode:", ["3-Char (Random)", "4-Char (Random)", "Custom List"])
-num_to_check = st.sidebar.slider("Number of users to check:", 10, 1000, 100)
-delay = st.sidebar.slider("Delay between checks (seconds):", 0.1, 1.0, 0.3)
+# Sidebar Configuration
+st.sidebar.header("Control Panel")
+mode = st.sidebar.selectbox("Mode:", ["3-Chars (Ultra Rare)", "4-Chars (Rare)", "Custom List"])
+count = st.sidebar.slider("Check Count:", 10, 1000, 500)
+speed = st.sidebar.select_slider("Speed Level:", options=["Safe", "Fast", "Turbo"], value="Fast")
 
-def check_user(user):
-    # Added rotating user agents to look more like a browser
+# Speed mapping
+delay_map = {"Safe": 0.5, "Fast": 0.2, "Turbo": 0.05}
+current_delay = delay_map[speed]
+
+def check_username(user):
+    # Rotating User-Agents to prevent IP blocks
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebkit/{random.randint(500, 600)}.36"
     }
     url = f"https://rec.net/user/{user}"
     try:
-        response = requests.get(url, headers=headers, timeout=3)
-        if response.status_code == 404:
-            return "available"
-        elif response.status_code == 200:
-            return "taken"
-        else:
-            return "rate_limit"
+        # Fast request with low timeout
+        resp = requests.get(url, headers=headers, timeout=2)
+        if resp.status_code == 404:
+            return "AVAIL"
+        elif resp.status_code == 200:
+            return "TAKEN"
+        return "BLOCKED"
     except:
-        return "error"
+        return "ERROR"
 
-def generate_user(length):
-    chars = string.ascii_lowercase + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
-
-# Main Logic
+# Logic for Generation
 if "Custom" in mode:
-    user_input = st.text_area("Enter usernames (one per line):")
-    to_check = user_input.split('\n') if user_input else []
-    start_btn = st.button("Start Checking List")
+    raw_input = st.text_area("Paste List (One per line):")
+    targets = [x.strip() for x in raw_input.split('\n') if x.strip()]
+    btn_text = "Check Custom List"
 else:
     length = 3 if "3" in mode else 4
-    to_check = [generate_user(length) for _ in range(num_to_check)]
-    start_btn = st.button(f"Generate & Check {num_to_check} Users")
+    chars = string.ascii_lowercase + string.digits
+    targets = [''.join(random.choice(chars) for _ in range(length)) for _ in range(count)]
+    btn_text = f"Hunt {count} Usernames"
 
-if start_btn and to_check:
-    st.divider()
-    found_list = []
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+if st.button(btn_text):
+    st.info(f"Starting Hunt... Mode: {mode} | Speed: {speed}")
+    avail_list = []
+    prog = st.progress(0)
+    log = st.empty()
     
-    # Create columns for real-time results
-    col1, col2 = st.columns(2)
+    # Using columns for better visual tracking
+    res_col1, res_col2 = st.columns(2)
     
-    for idx, user in enumerate(to_check):
-        user = user.strip()
-        if not user: continue
+    for i, user in enumerate(targets):
+        log.text(f"Scanning: {user} [{i+1}/{len(targets)}]")
+        status = check_username(user)
         
-        status_text.text(f"Checking: {user} ({idx+1}/{len(to_check)})")
-        result = check_user(user)
-        
-        if result == "available":
-            col1.success(f"Available: {user}")
-            found_list.append(user)
-        elif result == "rate_limit":
-            st.error("Rate limit detected! Slow down the delay in settings.")
+        if status == "AVAIL":
+            res_col1.success(f"FOUND: {user}")
+            avail_list.append(user)
+        elif status == "BLOCKED":
+            st.warning("Rate limit reached! Switch speed to 'Safe' or wait 1 min.")
             break
-        
-        # Update progress
-        progress_bar.progress((idx + 1) / len(to_check))
-        time.sleep(delay)
+            
+        prog.progress((i + 1) / len(targets))
+        time.sleep(current_delay)
 
-    st.divider()
-    if found_list:
+    st.markdown("---")
+    if avail_list:
         st.balloons()
-        st.write(f"### Found {len(found_list)} Available Usernames:")
-        st.code("\n".join(found_list))
+        st.subheader("🎯 Results (Available):")
+        st.code("\n".join(avail_list))
     else:
-        st.info("No available usernames found in this batch. Try again!")
+        st.error("No available usernames found. Try another batch!")
 
-st.caption("Performance Mode Active | Max 1000 Users")
+st.caption("Engine: Streamlit | Limit: 1000 | Lang: EN")
